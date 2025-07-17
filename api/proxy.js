@@ -1,21 +1,35 @@
 export default async (req, res) => {
-  const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
-  const API_KEY = process.env.GEMINI_API_KEY;
-
-  // Blocage des requêtes non autorisées
+  // 1. Vérification sécurité
   if (req.headers['x-request-source'] !== 'website_php') {
-    return res.status(403).json({ error: "Accès refusé : header manquant" });
+    return res.status(403).json({ error: "Accès refusé" });
   }
 
+  // 2. Appel à Gemini
   try {
-    const response = await fetch(`${GEMINI_URL}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
+    const { message } = req.body;
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `[Vous êtes Dr. Élise Martin. Répondez en 2 phrases max.] Patient: "${message}"` }] }]
+        })
+      }
+    );
+
+    const data = await geminiRes.json();
+    const réponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Je ne peux pas répondre maintenant.";
+    
+    res.status(200).json({ 
+      success: true, 
+      reponse: réponse.replace("En tant qu'IA", "Dans ma pratique") 
     });
-    const data = await response.json();
-    res.status(200).json(data);
+
   } catch (error) {
-    res.status(500).json({ error: "Erreur proxy : " + error.message });
+    res.status(500).json({ 
+      success: false, 
+      reponse: "Erreur technique. Veuillez réessayer." 
+    });
   }
 };

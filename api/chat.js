@@ -1,73 +1,60 @@
-import { v4 as uuidv4 } from 'uuid';
-
+// api/chat.js - Version simplifiée pour diagnostic
 export default async (req, res) => {
-    // Autoriser CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Autoriser les requêtes depuis votre site
+  res.setHeader('Access-Control-Allow-Origin', 'https://www.top-affaires.fr');
+  res.setHeader('Content-Type', 'application/json');
 
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Méthode non autorisée' });
-    }
+  // Mode simulation activable/désactivable
+  const SIMULATION_MODE = true; // ← Mettez à false pour réactiver Gemini
 
-    try {
-        const { message } = req.body;
-        if (!message || typeof message !== 'string') {
-            return res.status(400).json({ error: 'Message invalide' });
-        }
+  if (SIMULATION_MODE) {
+    // Réponses simulées pour tester sans l'API Gemini
+    const responses = [
+      "Je suis actuellement en mode test. Tout fonctionne côté serveur !",
+      "Cette réponse simulée confirme que Vercel répond correctement.",
+      "Le problème ne vient pas du déploiement Vercel."
+    ];
 
-        // Prompt optimisé
-        const prompt = {
-            contents: [{
-                parts: [{
-                    text: `Tu es Dr. Élise Martin, psychologue clinicienne. 
-                           Réponds de manière professionnelle mais chaleureuse :
-                           Patient : "${message.trim()}"
-                           Consignes :
-                           - Maximum 3 phrases
-                           - Ton naturel et empathique
-                           - Ne parle pas de ton statut d'IA
-                           - Utilise "mon expérience clinique" plutôt que "mon algorithme"`
-                }]
+    // Simulation délai humain (1 à 3 secondes)
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+
+    return res.status(200).json({
+      success: true,
+      reponse: responses[Math.floor(Math.random() * responses.length)]
+    });
+  }
+
+  // Code original (à n'utiliser que si SIMULATION_MODE = false)
+  try {
+    const { message } = req.body;
+    
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `[Votre prompt habituel] Patient : "${message}"`
             }]
-        };
+          }]
+        })
+      }
+    );
 
-        // Appel à l'API Gemini
-        const apiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(prompt),
-                timeout: 10000
-            }
-        );
+    const data = await response.json();
+    const reponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Pas de réponse";
 
-        if (!apiResponse.ok) {
-            throw new Error(`API Gemini a répondu avec le statut ${apiResponse.status}`);
-        }
+    return res.status(200).json({
+      success: true,
+      reponse: reponse.replace("En tant qu'IA", "Dans ma pratique")
+    });
 
-        const data = await apiResponse.json();
-        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text 
-            || "Je n'ai pas pu générer de réponse.";
-
-        // Simulation délai humain
-        await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-
-        return res.status(200).json({
-            success: true,
-            reponse: responseText
-                .replace(/En tant qu'IA|mon algorithme/gi, match => 
-                    match === "En tant qu'IA" ? "Dans ma pratique" : "mon expérience clinique")
-        });
-
-    } catch (error) {
-        console.error("ERREUR API:", error);
-        return res.status(500).json({
-            success: false,
-            reponse: process.env.NODE_ENV === 'development' 
-                ? `Erreur technique: ${error.message}`
-                : "Désolé, je rencontre une difficulté technique. Pouvez-vous reformuler ?"
-        });
-    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      reponse: "Erreur technique (mode réel)"
+    });
+  }
 };

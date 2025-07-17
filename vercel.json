@@ -1,11 +1,25 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/chat.js", "use": "@vercel/node" },
-    { "src": "public/**", "use": "@vercel/static" }
+    { 
+      "src": "api/*.js",
+      "use": "@vercel/node" 
+    },
+    { 
+      "src": "public/**", 
+      "use": "@vercel/static" 
+    }
   ],
-  "rewrites": [
-    { "source": "/api/chat", "destination": "/api/chat.js" },
-    { "source": "/(.*)", "destination": "/public/$1" }
+  "routes": [
+    {
+      "src": "/api/(chat|proxy)",
+      "dest": "/api/$1.js",
+      "methods": ["GET", "POST"]
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1",
+      "continue": true
+    }
   ]
 }
